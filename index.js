@@ -1,56 +1,103 @@
-import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
+import makeWASocket, {
+    useMultiFileAuthState,
+    DisconnectReason,
+    fetchLatestBaileysVersion
+} from "@whiskeysockets/baileys";
+
 import qrcode from "qrcode-terminal";
 
+let restarting = false;
+
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState("auth");
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState("auth");
+        const { version } = await fetchLatestBaileysVersion();
 
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: true
-    });
+        const sock = makeWASocket({
+            version,
+            auth: state,
+            printQRInTerminal: false,
+            browser: ["MIRA-AI", "Chrome", "1.0"],
+            keepAliveIntervalMs: 30000
+        });
 
-    sock.ev.on("creds.update", saveCreds);
+        sock.ev.on("creds.update", saveCreds);
 
-    sock.ev.on("connection.update", (update) => {
-        const { connection, lastDisconnect, qr } = update;
+        sock.ev.on("connection.update", (update) => {
+            const { connection, lastDisconnect, qr } = update;
 
-        if (qr) {
-            qrcode.generate(qr, { small: true });
-        }
-
-        if (connection === "close") {
-            const shouldReconnect =
-                lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-
-            if (shouldReconnect) {
-                startBot();
+            if (qr) {
+                console.log("📱 Scan QR :");
+                qrcode.generate(qr, { small: true });
             }
-        }
 
-        if (connection === "open") {
-            console.log("✅ MIRA-AI connecté à WhatsApp !");
-        }
-    });
+            if (connection === "open") {
+                console.log("✅ BOT CONNECTÉ ET STABLE");
+                restarting = false;
+            }
 
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-        const msg = messages[0];
+            if (connection === "close") {
+                const code = lastDisconnect?.error?.output?.statusCode;
 
-        if (!msg.message || msg.key.fromMe) return;
+                const shouldReconnect =
+                    code !== DisconnectReason.loggedOut;
 
-        const text =
-            msg.message.conversation ||
-            msg.message.extendedTextMessage?.text;
+                console.log("❌ Déconnexion. Code:", code);
 
-        console.log("Message reçu:", text);
+                if (shouldReconnect && !restarting) {
+                    restarting = true;
+                    console.log("🔄 Redémarrage du bot...");
 
-        if (text) {
-            let response = "Je suis MIRA-AI 🤖. Tu as dit : " + text;
+                    setTimeout(() => {
+                        startBot();
+                    }, 5000);
+                }
+            }
+        });
+
+        sock.ev.on("messages.upsert", async ({ messages }) => {
+            const msg = messages[0];
+
+            if (!msg.message || msg.key.fromMe) return;
+
+            const text =
+                msg.message.conversation ||
+                msg.message.extendedTextMessage?.text;
+
+            if (!text) return;
+
+            console.log("📩 Message:", text);
 
             await sock.sendMessage(msg.key.remoteJid, {
-                text: response
+                text: "🤖 MIRA-AI : " + text
             });
-        }
-    });
+        });
+
+        // 🔥 Anti freeze Render
+        setInterval(() => {
+            console.log("💓 Alive...");
+        }, 20000);
+
+    } catch (err) {
+        console.log("💥 Crash détecté :", err);
+
+        console.log("🔄 Relance globale...");
+
+        setTimeout(() => {
+            startBot();
+        }, 5000);
+    }
 }
+
+// 🔥 Anti crash global Node
+process.on("uncaughtException", (err) => {
+    console.log("💥 uncaughtException:", err);
+    startBot();
+});
+
+process.on("unhandledRejection", (err) => {
+    console.log("💥 unhandledRejection:", err);
+    startBot();
+});
 
 startBot();
