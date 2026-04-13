@@ -15,15 +15,16 @@ async function startBot() {
             version,
             auth: state,
             browser: ["MIRA-AI", "Chrome", "1.0"],
-            keepAliveIntervalMs: 30000
+            keepAliveIntervalMs: 30000,
+            connectTimeoutMs: 60000
         });
 
         sock.ev.on("creds.update", saveCreds);
 
-        // 🔥 MET TON NUMERO ICI (format international sans +)
-        const number = "257XXXXXXXX"; // exemple Burundi
+        // 🔥 TON NUMERO ICI (format international sans +)
+        const number = "257XXXXXXXX";
 
-        // 🔥 PAIRING CODE (UNE SEULE FOIS)
+        // 🔑 PAIRING CODE (une seule fois)
         if (!sock.authState.creds.registered) {
             const code = await sock.requestPairingCode(number);
             console.log("🔑 CODE WHATSAPP :", code);
@@ -78,7 +79,7 @@ async function startBot() {
             });
         });
 
-        // 🔥 KEEP ALIVE
+        // 💓 KEEP ALIVE (évite sleep Render)
         setInterval(() => {
             console.log("💓 MIRA-AI actif...");
         }, 20000);
@@ -91,5 +92,16 @@ async function startBot() {
         }, 5000);
     }
 }
+
+// 🔥 Anti crash global
+process.on("uncaughtException", (err) => {
+    console.log("💥 uncaughtException:", err);
+    startBot();
+});
+
+process.on("unhandledRejection", (err) => {
+    console.log("💥 unhandledRejection:", err);
+    startBot();
+});
 
 startBot();
