@@ -22,7 +22,7 @@ async function startBot() {
         sock.ev.on("creds.update", saveCreds);
 
         // 🔥 TON NUMERO ICI (format international sans +)
-        const number = "257XXXXXXXX";
+        const number = "25766486303";
 
         // 🔑 PAIRING CODE (une seule fois)
         if (!sock.authState.creds.registered) {
