@@ -5,6 +5,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 
 let restarting = false;
+let codeGenerated = false; // 🔥 évite spam code
 
 async function startBot() {
     try {
@@ -21,13 +22,23 @@ async function startBot() {
 
         sock.ev.on("creds.update", saveCreds);
 
-        // 🔥 TON NUMERO ICI (format international sans +)
+        // 🔥 TON NUMERO ICI (sans +)
         const number = "25766486303";
 
-        // 🔑 PAIRING CODE (une seule fois)
-        if (!sock.authState.creds.registered) {
-            const code = await sock.requestPairingCode(number);
-            console.log("🔑 CODE WHATSAPP :", code);
+        // 🔑 PAIRING CODE FIX
+        if (!sock.authState.creds.registered && !codeGenerated) {
+            codeGenerated = true;
+
+            console.log("📱 Préparation du code WhatsApp...");
+
+            setTimeout(async () => {
+                try {
+                    const code = await sock.requestPairingCode(number);
+                    console.log("🔑 CODE WHATSAPP :", code);
+                } catch (err) {
+                    console.log("⚠️ Erreur génération code :", err.message);
+                }
+            }, 5000); // 🔥 laisse connexion stable
         }
 
         sock.ev.on("connection.update", async (update) => {
@@ -79,7 +90,7 @@ async function startBot() {
             });
         });
 
-        // 💓 KEEP ALIVE (évite sleep Render)
+        // 💓 KEEP ALIVE
         setInterval(() => {
             console.log("💓 MIRA-AI actif...");
         }, 20000);
@@ -93,15 +104,13 @@ async function startBot() {
     }
 }
 
-// 🔥 Anti crash global
+// 🔥 anti crash global
 process.on("uncaughtException", (err) => {
     console.log("💥 uncaughtException:", err);
-    startBot();
 });
 
 process.on("unhandledRejection", (err) => {
     console.log("💥 unhandledRejection:", err);
-    startBot();
 });
 
 startBot();
