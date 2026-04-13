@@ -1,10 +1,8 @@
 import makeWASocket, {
     useMultiFileAuthState,
-    DisconnectReason,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    DisconnectReason
 } from "@whiskeysockets/baileys";
-
-import qrcode from "qrcode-terminal";
 
 let restarting = false;
 
@@ -16,23 +14,31 @@ async function startBot() {
         const sock = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: false,
             browser: ["MIRA-AI", "Chrome", "1.0"],
             keepAliveIntervalMs: 30000
         });
 
         sock.ev.on("creds.update", saveCreds);
 
-        sock.ev.on("connection.update", (update) => {
-            const { connection, lastDisconnect, qr } = update;
+        // 🔥 MET TON NUMERO ICI (format international sans +)
+        const number = "257XXXXXXXX"; // exemple Burundi
 
-            if (qr) {
-                console.log("📱 Scan QR :");
-                qrcode.generate(qr, { small: true });
-            }
+        // 🔥 PAIRING CODE (UNE SEULE FOIS)
+        if (!sock.authState.creds.registered) {
+            const code = await sock.requestPairingCode(number);
+            console.log("🔑 CODE WHATSAPP :", code);
+        }
+
+        sock.ev.on("connection.update", async (update) => {
+            const { connection, lastDisconnect } = update;
 
             if (connection === "open") {
-                console.log("✅ BOT CONNECTÉ ET STABLE");
+                console.log("✅ MIRA-AI CONNECTÉ !");
+
+                await sock.sendMessage(sock.user.id, {
+                    text: "🤖 MIRA-AI est connecté avec succès !"
+                });
+
                 restarting = false;
             }
 
@@ -42,11 +48,10 @@ async function startBot() {
                 const shouldReconnect =
                     code !== DisconnectReason.loggedOut;
 
-                console.log("❌ Déconnexion. Code:", code);
+                console.log("❌ Déconnexion. Reconnexion :", shouldReconnect);
 
                 if (shouldReconnect && !restarting) {
                     restarting = true;
-                    console.log("🔄 Redémarrage du bot...");
 
                     setTimeout(() => {
                         startBot();
@@ -66,38 +71,25 @@ async function startBot() {
 
             if (!text) return;
 
-            console.log("📩 Message:", text);
+            console.log("📩 Message :", text);
 
             await sock.sendMessage(msg.key.remoteJid, {
                 text: "🤖 MIRA-AI : " + text
             });
         });
 
-        // 🔥 Anti freeze Render
+        // 🔥 KEEP ALIVE
         setInterval(() => {
-            console.log("💓 Alive...");
+            console.log("💓 MIRA-AI actif...");
         }, 20000);
 
     } catch (err) {
-        console.log("💥 Crash détecté :", err);
-
-        console.log("🔄 Relance globale...");
+        console.log("💥 Crash :", err);
 
         setTimeout(() => {
             startBot();
         }, 5000);
     }
 }
-
-// 🔥 Anti crash global Node
-process.on("uncaughtException", (err) => {
-    console.log("💥 uncaughtException:", err);
-    startBot();
-});
-
-process.on("unhandledRejection", (err) => {
-    console.log("💥 unhandledRejection:", err);
-    startBot();
-});
 
 startBot();
